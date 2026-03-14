@@ -5,10 +5,11 @@ import {
   PolarGrid, PolarAngleAxis, Radar
 } from "recharts"
 
+
 // ─────────────────────────────────────────────
 // Config — swap these for your real endpoints
 // ─────────────────────────────────────────────
-const API_BASE = "https://YOUR_API_GATEWAY_URL/dev"
+const API_BASE = import.meta.env.VITE_API_BASE
 
 const ENDPOINTS = {
   commitActivity: `${API_BASE}/commit-activity`,
