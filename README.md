@@ -18,7 +18,6 @@ Enter a GitHub repository URL and choose one of three analyses:
 | API | AWS API Gateway |
 | Compute | AWS Lambda (Python 3.12) |
 | Cache | AWS DynamoDB |
-| Storage | AWS S3 |
 | Data source | GitHub REST API |
 
 ## How it works
