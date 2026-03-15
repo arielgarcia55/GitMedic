@@ -22,8 +22,10 @@ const ENDPOINTS = {
 // ─────────────────────────────────────────────
 function mockCommitActivity(repoName) {
   const heatmap = {}
-  const start = new Date(2026, 0, 1)
-  const end   = new Date(2026, 2, 14)
+  const end   = new Date()
+  const start = new Date(end)
+  start.setFullYear(start.getFullYear() - 1)
+  start.setDate(start.getDate() + 1)
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
     const key = d.toISOString().split("T")[0]
     const wd  = d.getDay()
@@ -52,18 +54,49 @@ function mockCommitActivity(repoName) {
   }
 }
  
+function scoreToGrade(score) {
+  if (score >= 90) return "A+"
+  if (score >= 80) return "A"
+  if (score >= 77) return "A-"
+  if (score >= 73) return "B+"
+  if (score >= 70) return "B"
+  if (score >= 67) return "B-"
+  if (score >= 63) return "C+"
+  if (score >= 60) return "C"
+  if (score >= 57) return "C-"
+  if (score >= 50) return "D"
+  return "F"
+}
+ 
+function gradeColor(grade) {
+  if (grade.startsWith("A")) return "#39d353"
+  if (grade.startsWith("B")) return "#58a6ff"
+  if (grade.startsWith("C")) return "#d29922"
+  return "#f85149"
+}
+ 
+function generateAdvice(signals) {
+  const weak = signals.filter(s => s.score < 65).map(s => s.name.toLowerCase())
+  if (weak.length === 0) return "This repo is in great shape. Keep up the consistent activity and engagement."
+  const listed = weak.length === 1
+    ? weak[0]
+    : weak.slice(0, -1).join(", ") + ", and " + weak[weak.length - 1]
+  return `Based on ${listed}, contributors on this repo should focus on improving these areas to raise the overall health score.`
+}
+ 
 function mockHealthScore(repoName) {
   const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
   const signals = [
-    { name: "Commit frequency", score: rand(55, 95) },
-    { name: "Issue resolution",  score: rand(40, 90) },
-    { name: "PR turnaround",     score: rand(50, 88) },
+    { name: "Commit frequency",      score: rand(55, 95) },
+    { name: "Issue backlog",         score: rand(40, 90) },
     { name: "Contributor diversity", score: rand(35, 85) },
-    { name: "Issue backlog",     score: rand(45, 92) },
+    { name: "PR open/close ratio",   score: rand(50, 95) },
+    { name: "PR turnaround",         score: rand(45, 88) },
   ]
   const overall = Math.round(signals.reduce((s, x) => s + x.score, 0) / signals.length)
-  const grade   = overall >= 80 ? "A" : overall >= 65 ? "B" : overall >= 50 ? "C" : "D"
-  return { overall, grade, signals }
+  const grade   = scoreToGrade(overall)
+  const advice  = generateAdvice(signals)
+  return { overall, grade, signals, advice }
 }
  
 function mockRiskDetection(repoName) {
@@ -275,46 +308,70 @@ function CommitActivityView({ data }) {
 // Health Score view
 // ─────────────────────────────────────────────
 function HealthScoreView({ data }) {
-  const gradeColor = data.grade === "A" ? "#39d353" : data.grade === "B" ? "#58a6ff" : data.grade === "C" ? "#d29922" : "#f85149"
-  const radarData  = data.signals.map(s => ({ subject: s.name, score: s.score, fullMark: 100 }))
+  // Normalize Lambda response shape vs mock shape
+  const grade   = data.overall?.grade || data.grade || scoreToGrade(data.overall)
+  const wscore  = data.overall?.weighted_score
+  const overall = wscore != null ? Math.round(wscore * 100) : data.overall
+  const signals = (data.sub_scores || data.signals || []).map(s => ({
+    name:  s.displayName || s.name,
+    score: s.score <= 1 ? Math.round(s.score * 100) : s.score,
+    note:  s.note,
+    label: s.label,
+  }))
+  const gColor  = gradeColor(grade)
+  const advice  = data.advice || generateAdvice(signals)
  
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 14 }}>
-        <MetricCard label="Overall score" value={`${data.overall}/100`} color={gradeColor} />
-        <MetricCard label="Grade"          value={data.grade} color={gradeColor} />
-        <MetricCard label="Signals tracked" value={data.signals.length} />
+      {/* Big overall grade */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "28px 0 24px", marginBottom: 14, background: "#161b22", border: "1px solid #30363d", borderRadius: 8 }}>
+        <p style={{ fontSize: 11, color: "#8b949e", margin: "0 0 8px", textTransform: "uppercase", letterSpacing: ".8px" }}>Health Score</p>
+        <div style={{
+          width: 96, height: 96, borderRadius: 16,
+          border: `2px solid ${gColor}`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "#0d1117", marginBottom: 10,
+          boxShadow: `0 0 24px ${gColor}22`
+        }}>
+          <span style={{ fontSize: 42, fontWeight: 700, color: gColor, fontFamily: "monospace", letterSpacing: "-2px" }}>{grade}</span>
+        </div>
+        <p style={{ fontSize: 12, color: "#8b949e", margin: 0, fontFamily: "monospace" }}>{overall}/100</p>
       </div>
  
-      <SectionCard title="Health signals breakdown">
-        <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ flex: "0 0 220px" }}>
-            <ResponsiveContainer width={220} height={200}>
-              <RadarChart data={radarData}>
-                <PolarGrid stroke="#30363d" />
-                <PolarAngleAxis dataKey="subject" tick={{ fill: "#8b949e", fontSize: 10 }} />
-                <Radar dataKey="score" stroke="#58a6ff" fill="#58a6ff" fillOpacity={0.15} />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
-          <div style={{ flex: 1, minWidth: 200 }}>
-            {data.signals.map((s, i) => {
-              const barColor = s.score >= 75 ? "#39d353" : s.score >= 50 ? "#d29922" : "#f85149"
-              return (
-                <div key={i} style={{ marginBottom: 12 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, color: "#e6edf3" }}>{s.name}</span>
-                    <span style={{ fontSize: 12, fontFamily: "monospace", color: barColor }}>{s.score}</span>
-                  </div>
-                  <div style={{ height: 4, background: "#21262d", borderRadius: 2, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${s.score}%`, background: barColor, borderRadius: 2, transition: "width .6s ease" }} />
-                  </div>
+      {/* Subscore cards */}
+      <SectionCard title="Subscores">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10 }}>
+          {signals.map((s, i) => {
+            const sg    = scoreToGrade(s.score)
+            const sgCol = gradeColor(sg)
+            return (
+              <div key={i} title={s.note || ""} style={{
+                background: "#0d1117", border: `1px solid #30363d`,
+                borderRadius: 8, padding: "14px 12px",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+                cursor: s.note ? "help" : "default"
+              }}>
+                <div style={{
+                  width: 52, height: 52, borderRadius: 10,
+                  border: `1.5px solid ${sgCol}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: "#161b22"
+                }}>
+                  <span style={{ fontSize: 22, fontWeight: 700, color: sgCol, fontFamily: "monospace" }}>{sg}</span>
                 </div>
-              )
-            })}
-          </div>
+                <p style={{ fontSize: 11, color: "#8b949e", margin: 0, textAlign: "center", lineHeight: 1.4 }}>{s.name}</p>
+                {s.label && <span style={{ fontSize: 10, color: sgCol, fontFamily: "monospace", textAlign: "center" }}>{s.label}</span>}
+              </div>
+            )
+          })}
         </div>
       </SectionCard>
+ 
+      {/* Advice */}
+      <div style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: "16px 20px" }}>
+        <p style={{ fontSize: 12, fontWeight: 500, color: "#8b949e", margin: "0 0 8px", textTransform: "uppercase", letterSpacing: ".6px" }}>Advice</p>
+        <p style={{ fontSize: 13, color: "#c9d1d9", margin: 0, lineHeight: 1.6 }}>{advice}</p>
+      </div>
     </div>
   )
 }
@@ -428,7 +485,7 @@ export default function RepoAnalyzer() {
  
         {/* Header */}
         <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 4px", letterSpacing: "-.3px" }}>Git Medic</h1>
+          <h1 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 4px", letterSpacing: "-.3px" }}>Repo Analyzer</h1>
           <p style={{ fontSize: 13, color: "#8b949e", margin: 0 }}>Enter a GitHub repository to run analysis</p>
         </div>
  
