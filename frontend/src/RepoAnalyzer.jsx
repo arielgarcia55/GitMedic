@@ -51,7 +51,7 @@ function mockCommitActivity(repoName) {
     trendSummary: { trend, recentCommits: recent, previousCommits: prev, percentChange: pct }
   }
 }
-
+ 
 function mockHealthScore(repoName) {
   const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
   const signals = [
@@ -65,7 +65,7 @@ function mockHealthScore(repoName) {
   const grade   = overall >= 80 ? "A" : overall >= 65 ? "B" : overall >= 50 ? "C" : "D"
   return { overall, grade, signals }
 }
-
+ 
 function mockRiskDetection(repoName) {
   return {
     risks: [
@@ -96,7 +96,7 @@ function mockRiskDetection(repoName) {
     ]
   }
 }
-
+ 
 // ─────────────────────────────────────────────
 // Heatmap
 // ─────────────────────────────────────────────
@@ -107,15 +107,21 @@ function heatColor(n) {
   if (n < 10) return "#26a641"
   return "#39d353"
 }
-
+ 
 function CommitHeatmap({ heatmap }) {
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+  const months    = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
   const dayLabels = ["","M","","W","","F",""]
-  const start = new Date(2026, 0, 1)
-  const end   = new Date(2026, 2, 14)
+ 
+  // Derive range from actual data — always shows full 52 weeks
+  const allDates = Object.keys(heatmap).sort()
+  const end      = allDates.length ? new Date(allDates[allDates.length - 1]) : new Date()
+  const start    = new Date(end)
+  start.setFullYear(start.getFullYear() - 1)
+  start.setDate(start.getDate() + 1)
+ 
   const padStart = new Date(start)
   padStart.setDate(padStart.getDate() - padStart.getDay())
-
+ 
   const weeks = []
   let cur = new Date(padStart), week = []
   while (cur <= end || week.length > 0) {
@@ -131,7 +137,7 @@ function CommitHeatmap({ heatmap }) {
     while (week.length < 7) week.push({ date: "", count: null, month: 0, dom: 0 })
     weeks.push(week)
   }
-
+ 
   return (
     <div style={{ overflowX: "auto" }}>
       <div style={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
@@ -171,7 +177,7 @@ function CommitHeatmap({ heatmap }) {
     </div>
   )
 }
-
+ 
 // ─────────────────────────────────────────────
 // Metric card
 // ─────────────────────────────────────────────
@@ -183,7 +189,7 @@ function MetricCard({ label, value, color }) {
     </div>
   )
 }
-
+ 
 // ─────────────────────────────────────────────
 // Trend badge
 // ─────────────────────────────────────────────
@@ -200,7 +206,7 @@ function TrendBadge({ trend, pct }) {
     </span>
   )
 }
-
+ 
 // ─────────────────────────────────────────────
 // Section card wrapper
 // ─────────────────────────────────────────────
@@ -213,7 +219,7 @@ function SectionCard({ title, subtitle, children }) {
     </div>
   )
 }
-
+ 
 // ─────────────────────────────────────────────
 // Commit Activity view
 // ─────────────────────────────────────────────
@@ -221,7 +227,7 @@ function CommitActivityView({ data }) {
   const { trendSummary: ts } = data
   const pctColor = ts.percentChange > 0 ? "#39d353" : ts.percentChange < 0 ? "#f85149" : "#8b949e"
   const pctStr   = (ts.percentChange > 0 ? "+" : "") + ts.percentChange + "%"
-
+ 
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
@@ -230,11 +236,11 @@ function CommitActivityView({ data }) {
         <MetricCard label="Recent 30d"          value={ts.recentCommits} />
         <MetricCard label="vs prev 30d"         value={pctStr} color={pctColor} />
       </div>
-
-      <SectionCard title="Commit heatmap — 2026 year to date">
+ 
+      <SectionCard title="Commit heatmap — last 12 months">
         <CommitHeatmap heatmap={data.heatmap} />
       </SectionCard>
-
+ 
       <SectionCard title="Rolling 30-day activity" subtitle="Commit count in trailing 30 days, sampled every 2 days">
         <ResponsiveContainer width="100%" height={180}>
           <LineChart data={data.rollingActivity}>
@@ -250,7 +256,7 @@ function CommitActivityView({ data }) {
           </LineChart>
         </ResponsiveContainer>
       </SectionCard>
-
+ 
       <div style={{ background: "#161b22", border: `1px solid ${ts.trend === "increasing" ? "#0e4429" : ts.trend === "declining" ? "#4c1b1b" : "#30363d"}`, borderRadius: 8, padding: "12px 18px", display: "flex", alignItems: "center", gap: 12 }}>
         <TrendBadge trend={ts.trend} pct={ts.percentChange} />
         <span style={{ fontSize: 13, color: "#8b949e" }}>
@@ -264,14 +270,14 @@ function CommitActivityView({ data }) {
     </div>
   )
 }
-
+ 
 // ─────────────────────────────────────────────
 // Health Score view
 // ─────────────────────────────────────────────
 function HealthScoreView({ data }) {
   const gradeColor = data.grade === "A" ? "#39d353" : data.grade === "B" ? "#58a6ff" : data.grade === "C" ? "#d29922" : "#f85149"
   const radarData  = data.signals.map(s => ({ subject: s.name, score: s.score, fullMark: 100 }))
-
+ 
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 14 }}>
@@ -279,7 +285,7 @@ function HealthScoreView({ data }) {
         <MetricCard label="Grade"          value={data.grade} color={gradeColor} />
         <MetricCard label="Signals tracked" value={data.signals.length} />
       </div>
-
+ 
       <SectionCard title="Health signals breakdown">
         <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ flex: "0 0 220px" }}>
@@ -312,7 +318,7 @@ function HealthScoreView({ data }) {
     </div>
   )
 }
-
+ 
 // ─────────────────────────────────────────────
 // Risk Detection view
 // ─────────────────────────────────────────────
@@ -322,10 +328,10 @@ function RiskDetectionView({ data }) {
     medium: { bg: "#2d1d00", color: "#d29922", border: "#5a3a00", label: "Medium" },
     low:    { bg: "#0d2119", color: "#3fb950", border: "#1b4332", label: "Low" },
   }
-
+ 
   const counts = { high: 0, medium: 0, low: 0 }
   data.risks.forEach(r => counts[r.severity]++)
-
+ 
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 14 }}>
@@ -333,7 +339,7 @@ function RiskDetectionView({ data }) {
         <MetricCard label="Medium severity" value={counts.medium} color="#d29922" />
         <MetricCard label="Low severity"    value={counts.low}    color="#3fb950" />
       </div>
-
+ 
       {data.risks.map((risk, i) => {
         const c = sevConfig[risk.severity]
         return (
@@ -354,7 +360,7 @@ function RiskDetectionView({ data }) {
     </div>
   )
 }
-
+ 
 // ─────────────────────────────────────────────
 // Main App
 // ─────────────────────────────────────────────
@@ -363,9 +369,9 @@ const ANALYSES = [
   { key: "healthScore",    label: "Repo Health Score", desc: "Composite score across key health signals" },
   { key: "riskDetection",  label: "Risk Detection",    desc: "Bus factor, stale branches, and contributor risk" },
 ]
-
-const USE_MOCK = true // Set to false once your Lambdas are live
-
+ 
+const USE_MOCK = false // Set to false once your Lambdas are live
+ 
 export default function RepoAnalyzer() {
   const [repoUrl,   setRepoUrl]   = useState("")
   const [active,    setActive]    = useState(null)
@@ -373,24 +379,24 @@ export default function RepoAnalyzer() {
   const [loading,   setLoading]   = useState(null)
   const [error,     setError]     = useState(null)
   const resultsRef = useRef(null)
-
+ 
   const extractRepo = (url) => {
     const match = url.match(/github\.com\/([^/\s]+\/[^/\s]+)/)
     return match ? match[1].replace(/\.git$/, "") : url.trim()
   }
-
+ 
   const runAnalysis = async (key) => {
     if (!repoUrl.trim()) { setError("Please enter a GitHub repository URL first."); return }
     setError(null)
     setActive(key)
     setLoading(key)
-
+ 
     // Scroll to results
     setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100)
-
+ 
     try {
       let data
-
+ 
       if (USE_MOCK) {
         // Simulate network delay
         await new Promise(r => setTimeout(r, 1400))
@@ -404,7 +410,7 @@ export default function RepoAnalyzer() {
         if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Request failed") }
         data = await res.json()
       }
-
+ 
       setResults(prev => ({ ...prev, [key]: data }))
     } catch (e) {
       setError(e.message)
@@ -413,19 +419,19 @@ export default function RepoAnalyzer() {
       setLoading(null)
     }
   }
-
+ 
   const currentResult = active ? results[active] : null
-
+ 
   return (
     <div style={{ background: "#0d1117", minHeight: "100vh", padding: "32px 24px", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", color: "#e6edf3" }}>
       <div style={{ maxWidth: 860, margin: "0 auto" }}>
-
+ 
         {/* Header */}
         <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 4px", letterSpacing: "-.3px" }}>Repo Analyzer</h1>
+          <h1 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 4px", letterSpacing: "-.3px" }}>Git Medic</h1>
           <p style={{ fontSize: 13, color: "#8b949e", margin: 0 }}>Enter a GitHub repository to run analysis</p>
         </div>
-
+ 
         {/* Input */}
         <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
           <input
@@ -441,7 +447,7 @@ export default function RepoAnalyzer() {
             }}
           />
         </div>
-
+ 
         {/* Analysis buttons */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 28 }}>
           {ANALYSES.map(a => {
@@ -485,14 +491,14 @@ export default function RepoAnalyzer() {
             )
           })}
         </div>
-
+ 
         {/* Error */}
         {error && (
           <div style={{ background: "#4c1b1b", border: "1px solid #6e2323", borderRadius: 8, padding: "10px 16px", marginBottom: 14, fontSize: 13, color: "#f85149" }}>
             {error}
           </div>
         )}
-
+ 
         {/* Loading spinner */}
         {loading && (
           <div ref={resultsRef} style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 40, textAlign: "center", marginBottom: 14 }}>
@@ -509,7 +515,7 @@ export default function RepoAnalyzer() {
             </p>
           </div>
         )}
-
+ 
         {/* Results */}
         {!loading && currentResult && (
           <div ref={resultsRef}>
@@ -523,17 +529,17 @@ export default function RepoAnalyzer() {
                   {ANALYSES.find(a => a.key === active)?.label}
                 </span>
               </div>
-              <span style={{ fontSize: 11, color: "#484f58", fontFamily: "monospace" }}>2026 YTD</span>
+              <span style={{ fontSize: 11, color: "#484f58", fontFamily: "monospace" }}>last 12 months</span>
             </div>
-
+ 
             {active === "commitActivity" && <CommitActivityView data={currentResult} />}
             {active === "healthScore"    && <HealthScoreView    data={currentResult} />}
             {active === "riskDetection"  && <RiskDetectionView  data={currentResult} />}
           </div>
         )}
-
+ 
       </div>
-
+ 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg) } }
         input:focus { border-color: #388bfd !important; box-shadow: 0 0 0 3px rgba(56,139,253,.15) !important; }
